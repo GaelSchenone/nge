@@ -43,24 +43,22 @@ export default function ControlPanel({ params, onChange, onReset, onResetCamera,
   }, [params])
 
   const handleExportComponent = useCallback(() => {
-    const wkFn = (t) => `self.onmessage=function({data}){
-  const{stars,radius,arms,spin,scatter,density,size,innerColor,outerColor}=data
-  function h2r(h){const v=parseInt(h.slice(1),16);return{r:((v>>16)&255)/255,g:((v>>8)&255)/255,b:(v&255)/255}}
-  const i=h2r(innerColor),o=h2r(outerColor)
-  const p=new Float32Array(stars*3),c=new Float32Array(stars*3),s=new Float32Array(stars)
-  for(let n=0;n<stars;n++){
-    const a=n%arms,ai=a/arms*Math.PI*2,td=Math.pow(Math.random(),density),r=td*radius
-    const ang=ai+spin*r+(Math.random()-.5)*scatter*(1+r*.4),noi=scatter*r*.12,hf=.08+scatter*.18
-    p[n*3]=Math.cos(ang)*r+(Math.random()-.5)*noi
-    p[n*3+1]=(Math.random()-.5)*r*hf;p[n*3+2]=Math.sin(ang)*r+(Math.random()-.5)*noi
-    const mr=i.r+(o.r-i.r)*td,mg=i.g+(o.g-i.g)*td,mb=i.b+(o.b-i.b)*td
-    c[n*3]=mr;c[n*3+1]=mg;c[n*3+2]=mb
-    s[n]=size*(.5+(1-td)*1.5)*(.8+Math.random()*.4)
-  }
-  self.postMessage({_target:'${t}',positions:p,colors:c,sizes:s},[p.buffer,c.buffer,s.buffer])
-}`
-    const mWkUrl = URL.createObjectURL(new Blob([wkFn('main')], { type: 'application/javascript' }))
-    const dWkUrl = URL.createObjectURL(new Blob([wkFn('distant')], { type: 'application/javascript' }))
+    const MAIN_WORKER_SRC = `self.onmessage=function({data}){
+const{stars,radius,arms,spin,scatter,density,size,innerColor,outerColor}=data
+function h2r(h){const v=parseInt(h.slice(1),16);return{r:((v>>16)&255)/255,g:((v>>8)&255)/255,b:(v&255)/255}}
+const i=h2r(innerColor),o=h2r(outerColor)
+const p=new Float32Array(stars*3),c=new Float32Array(stars*3),s=new Float32Array(stars)
+for(let n=0;n<stars;n++){
+  const a=n%arms,ai=a/arms*Math.PI*2,td=Math.pow(Math.random(),density),r=td*radius
+  const ang=ai+spin*r+(Math.random()-.5)*scatter*(1+r*.4),noi=scatter*r*.12,hf=.08+scatter*.18
+  p[n*3]=Math.cos(ang)*r+(Math.random()-.5)*noi
+  p[n*3+1]=(Math.random()-.5)*r*hf;p[n*3+2]=Math.sin(ang)*r+(Math.random()-.5)*noi
+  const mr=i.r+(o.r-i.r)*td,mg=i.g+(o.g-i.g)*td,mb=i.b+(o.b-i.b)*td
+  c[n*3]=mr;c[n*3+1]=mg;c[n*3+2]=mb
+  s[n]=size*(.5+(1-td)*1.5)*(.8+Math.random()*.4)
+}
+self.postMessage({_target:'main',positions:p,colors:c,sizes:s},[p.buffer,c.buffer,s.buffer])}`
+    const DIST_WORKER_SRC = MAIN_WORKER_SRC.replace("'main'", "'distant'")
 
     const code = `import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
@@ -70,7 +68,17 @@ const VP=\`attribute float aSize;attribute vec3 aColor;varying vec3 vColor;
 void main(){vColor=aColor;vec4 mvPosition=modelViewMatrix*vec4(position,1.0);gl_PointSize=aSize*(5000.0/-mvPosition.z);gl_Position=projectionMatrix*mvPosition;}\`
 const FP=\`varying vec3 vColor;
 void main(){float d=length(gl_PointCoord-vec2(0.5));if(d>.5)discard;float alpha=smoothstep(.5,.0,d);gl_FragColor=vec4(vColor,alpha);}\`
+
 const P=${JSON.stringify(params)}
+
+// Inline worker sources — created at runtime so blob origin always matches
+const MAIN_WORKER_SRC = ${JSON.stringify(MAIN_WORKER_SRC)}
+const DIST_WORKER_SRC = MAIN_WORKER_SRC.replace(/'main'/, "'distant'")
+
+function makeWorker(src) {
+  return new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })))
+}
+
 export default function GalaxyBG({style,className}){
   const ref=useRef(null)
   useEffect(()=>{
@@ -87,8 +95,8 @@ export default function GalaxyBG({style,className}){
     ctrl.enableDamping=true;ctrl.dampingFactor=.05;ctrl.minDistance=2;ctrl.maxDistance=80
     const gg=new THREE.Group();s.add(gg)
     const dg=new THREE.Group();dg.position.z=-200;dg.rotation.x=.4;s.add(dg)
-    // Main galaxy worker
-    const wkm=new Worker('${mWkUrl}')
+    // Main galaxy worker (inline, no origin-locked blob)
+    const wkm=makeWorker(MAIN_WORKER_SRC)
     wkm.onmessage=({data})=>{
       const{positions,colors,sizes}=data
       const g=new THREE.BufferGeometry()
@@ -101,7 +109,7 @@ export default function GalaxyBG({style,className}){
     wkm.postMessage({stars:P.stars,radius:P.radius,arms:P.arms,spin:P.spin,scatter:P.scatter,density:P.density,size:P.size,innerColor:P.innerColor,outerColor:P.outerColor})
     // Distant galaxy worker
     if(P.distant?.enabled){
-      const wkd=new Worker('${dWkUrl}')
+      const wkd=makeWorker(DIST_WORKER_SRC)
       wkd.onmessage=({data})=>{
         const{positions,colors,sizes}=data
         const g=new THREE.BufferGeometry()
@@ -113,7 +121,7 @@ export default function GalaxyBG({style,className}){
       }
       wkd.postMessage({stars:P.distant.stars,radius:P.distant.radius,arms:P.distant.arms,spin:P.distant.spin,scatter:P.distant.scatter,density:2.8,size:P.distant.size,innerColor:P.distant.innerColor,outerColor:P.distant.outerColor})
     }
-    // Starfield (circular dots)
+    // Starfield
     if(P.starfield?.enabled){
       const dc=document.createElement('canvas');dc.width=32;dc.height=32
       const dctx=dc.getContext('2d')
@@ -145,7 +153,7 @@ export default function GalaxyBG({style,className}){
         const sp=new THREE.Sprite(nmat);sp.position.set(x,y,z);const sc=(P.nebula.density||.7)*P.radius*.8;sp.scale.set(sc,sc,1);gg.add(sp)
       }
     }
-    // Animation loop
+    // Animation
     let lt=0;let lastSpawn=0;const falls=[]
     function anim(t){
       requestAnimationFrame(anim)
@@ -155,7 +163,6 @@ export default function GalaxyBG({style,className}){
       if(P.animation?.mode==='Spin') gg.rotation.y+=.0002*(P.animation.speed||1)*dt
       else if(P.animation?.mode==='Orbit'){ctrl.autoRotate=true;ctrl.autoRotateSpeed=P.animation.speed||1}
       else ctrl.autoRotate=false
-      // Starfalls
       if(P.starfalls?.enabled&&Date.now()-lastSpawn>800&&falls.length<12){
         lastSpawn=Date.now()
         const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),rad=10+Math.random()*4
@@ -164,7 +171,6 @@ export default function GalaxyBG({style,className}){
         const sg2=new THREE.BufferGeometry();sg2.setAttribute('position',new THREE.BufferAttribute(sp2,3))
         const lm=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:1,blending:THREE.AdditiveBlending})
         const ln=new THREE.Line(sg2,lm);s.add(ln)
-        const startP=new THREE.Vector3(sx,sy,sz)
         falls.push({line:ln,start:Date.now(),dur:1200})
       }
       for(let si=falls.length-1;si>=0;si--){
@@ -185,10 +191,7 @@ export default function GalaxyBG({style,className}){
     link.download = 'GalaxyBackground.jsx'
     link.href = url; link.click()
     URL.revokeObjectURL(url)
-    setTimeout(() => URL.revokeObjectURL(mWkUrl), 60000)
-    setTimeout(() => URL.revokeObjectURL(dWkUrl), 60000)
   }, [params])
-
   const handleResetCamera = useCallback(() => onResetCamera?.(), [onResetCamera])
 
   const rowLabel = { fontSize: 11, color: '#888', width: 64, flexShrink: 0 }
