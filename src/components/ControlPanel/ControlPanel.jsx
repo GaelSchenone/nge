@@ -3,11 +3,12 @@ import ControlSection from './ControlSection'
 import SliderControl from './SliderControl'
 import ColorControl from './ColorControl'
 import TabBar from './TabBar'
-import { IconSave, IconExport } from '../icons/icons'
+import { IconSave, IconExport, IconShuffle } from '../icons/icons'
 
 export default function ControlPanel({ params, onChange, onReset, onResetCamera, onOpenExport }) {
   const [tab, setTab] = useState('MAIN')
   const [saved, setSaved] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const savedTimer = useRef(null)
 
   const update = useCallback((key, value) => {
@@ -30,6 +31,83 @@ export default function ControlPanel({ params, onChange, onReset, onResetCamera,
   const handleExport = useCallback(() => {
     onOpenExport?.()
   }, [onOpenExport])
+
+  const handleShareLink = useCallback(() => {
+    try {
+      const encoded = btoa(JSON.stringify(params))
+      const url = `${window.location.origin}${window.location.pathname}#p=${encoded}`
+      navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {}
+  }, [params])
+
+  const handleExportComponent = useCallback(() => {
+    const workerCode = `
+self.onmessage=function({data}){
+  const{_target,stars,radius,arms,spin,scatter,density,size,innerColor,outerColor}=data
+  function hexToRgb(h){const v=parseInt(h.slice(1),16);return{r:((v>>16)&255)/255,g:((v>>8)&255)/255,b:(v&255)/255}}
+  const i=hexToRgb(innerColor),o=hexToRgb(outerColor)
+  const p=new Float32Array(stars*3),c=new Float32Array(stars*3),s=new Float32Array(stars)
+  for(let n=0;n<stars;n++){
+    const a=n%arms,ai=a/arms*Math.PI*2,t=Math.pow(Math.random(),density),r=t*radius
+    const ang=ai+spin*r+(Math.random()-.5)*scatter*(1+r*.4),noi=scatter*r*.12,hf=.08+scatter*.18
+    p[n*3]=Math.cos(ang)*r+(Math.random()-.5)*noi
+    p[n*3+1]=(Math.random()-.5)*r*hf;p[n*3+2]=Math.sin(ang)*r+(Math.random()-.5)*noi
+    const mr=i.r+(o.r-i.r)*t,mg=i.g+(o.g-i.g)*t,mb=i.b+(o.b-i.b)*t
+    c[n*3]=mr;c[n*3+1]=mg;c[n*3+2]=mb
+    s[n]=size*(.5+(1-t)*1.5)*(.8+Math.random()*.4)
+  }
+  self.postMessage({_target,positions:p,colors:c,sizes:s},[p.buffer,c.buffer,s.buffer])
+}`
+    const workerBlob = new Blob([workerCode], { type: 'application/javascript' })
+    const workerUrl = URL.createObjectURL(workerBlob)
+
+    const code = `import { useEffect, useRef } from 'react'
+import * as THREE from 'three'
+
+const VP=\`attribute float aSize;attribute vec3 aColor;varying vec3 vColor;
+void main(){vColor=aColor;vec4 mvPosition=modelViewMatrix*vec4(position,1.0);gl_PointSize=aSize*(5000.0/-mvPosition.z);gl_Position=projectionMatrix*mvPosition;}\`
+const FP=\`varying vec3 vColor;
+void main(){float d=length(gl_PointCoord-vec2(0.5));if(d>.5)discard;float alpha=smoothstep(.5,.0,d);gl_FragColor=vec4(vColor,alpha);}\`
+const P=${JSON.stringify(params)}
+export default function GalaxyBG({style,className}){
+  const ref=useRef(null)
+  useEffect(()=>{
+    const el=ref.current;if(!el)return
+    const w=el.clientWidth,h=el.clientHeight
+    const r=new THREE.WebGLRenderer({antialias:true})
+    r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(w,h);r.setClearColor(new THREE.Color(P.bgColor||'#0a0a0f'),1)
+    el.appendChild(r.domElement)
+    const s=new THREE.Scene(),c=new THREE.PerspectiveCamera(60,w/h,0.1,1e4)
+    c.position.set(0,6,14);c.lookAt(0,0,0)
+    const gg=new THREE.Group();s.add(gg)
+    const wk=new Worker('${workerUrl}')
+    wk.onmessage=({data})=>{
+      const{positions,colors,sizes}=data
+      const g=new THREE.BufferGeometry()
+      g.setAttribute('position',new THREE.BufferAttribute(positions,3))
+      g.setAttribute('aColor',new THREE.BufferAttribute(colors,3))
+      g.setAttribute('aSize',new THREE.BufferAttribute(sizes,1))
+      const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:VP,fragmentShader:FP})
+      gg.add(new THREE.Points(g,m))
+    }
+    wk.postMessage({_target:'main',...P})
+    let lt=0
+    function anim(t){requestAnimationFrame(anim);lt||=t-16;const dt=Math.min(t-lt,50)/16;lt=t;gg.rotation.y+=.0002*dt;r.render(s,c)}
+    requestAnimationFrame(anim)
+    return()=>{r.dispose();wk.terminate();r.domElement.remove()}
+  },[])
+  return<dib ref={ref} style={{position:'fixed',inset:0,overflow:'hidden',...style}} className={className}/>
+}`
+    const blob = new Blob([code], { type: 'text/jsx' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.download = 'GalaxyBackground.jsx'
+    link.href = url; link.click()
+    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(workerUrl), 60000)
+  }, [params])
 
   const handleResetCamera = useCallback(() => onResetCamera?.(), [onResetCamera])
 
@@ -180,23 +258,44 @@ export default function ControlPanel({ params, onChange, onReset, onResetCamera,
       </div>
 
       {/* Footer */}
-      <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid var(--border)', marginTop: 'auto' }}>
-        <button onClick={handleSave} style={{
-          flex: 1, padding: 8, fontSize: 11, fontWeight: 500,
-          background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          fontFamily: 'inherit', transition: 'background 0.15s',
-        }}>
-          <IconSave size={12} />
-          {saved ? 'Saved ✓' : 'Save'}
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderTop: '1px solid var(--border)', marginTop: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={handleSave} style={{
+            flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 500,
+            background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            fontFamily: 'inherit',
+          }}>
+            <IconSave size={11} />
+            {saved ? 'Saved ✓' : 'Save'}
+          </button>
+          <button onClick={handleShareLink} style={{
+            flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 500,
+            background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            fontFamily: 'inherit',
+          }}>
+            {linkCopied ? '✓ Copied' : 'Share'}
+          </button>
+          <button onClick={handleExportComponent} style={{
+            flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 500,
+            background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            fontFamily: 'inherit',
+          }}>
+            <IconShuffle size={11} />
+            React
+          </button>
+        </div>
         <button onClick={handleExport} style={{
-          flex: 1, padding: 8, fontSize: 11, fontWeight: 600,
+          width: '100%', padding: '7px 0', fontSize: 11, fontWeight: 600,
           background: '#ffffff', border: 'none',
           borderRadius: 'var(--radius-md)', color: '#000', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          fontFamily: 'inherit', transition: 'opacity 0.15s',
+          fontFamily: 'inherit',
         }}>
           <IconExport size={12} />
           Export

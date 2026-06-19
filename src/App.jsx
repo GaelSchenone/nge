@@ -62,6 +62,12 @@ function randomizeParams() {
 export default function App() {
   const [params, setParams] = useState(() => {
     try {
+      // Check URL hash for shared params first
+      const hash = window.location.hash
+      if (hash.startsWith('#p=')) {
+        const decoded = JSON.parse(atob(hash.slice(3)))
+        return { ...DEFAULT_PARAMS, ...decoded }
+      }
       const saved = localStorage.getItem('stardust-params')
       return saved ? { ...DEFAULT_PARAMS, ...JSON.parse(saved) } : DEFAULT_PARAMS
     } catch { return DEFAULT_PARAMS }
