@@ -106,52 +106,54 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--bg-base)' }}>
-      {/* Left: Canvas area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <GalaxyCanvas ref={canvasRef} params={params} isPlaying={isPlaying} />
+    <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
+      {/* Canvas fills the entire container */}
+      <GalaxyCanvas ref={canvasRef} params={params} isPlaying={isPlaying} />
 
-        {/* Top toolbar */}
-        <div style={{
-          position: 'absolute', top: 12, left: 12, right: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          pointerEvents: 'none', zIndex: 10,
+      {/* Top toolbar — floats over canvas */}
+      <div style={{
+        position: 'absolute', top: 12, left: 12, right: 12 + 280 + 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        pointerEvents: 'none', zIndex: 15,
+      }}>
+        <span style={{
+          fontSize: 13, fontWeight: 500, letterSpacing: '0.3em',
+          color: 'var(--text-primary)', pointerEvents: 'auto',
         }}>
-          <span style={{
-            fontSize: 13, fontWeight: 500, letterSpacing: '0.3em',
-            color: 'var(--text-primary)', pointerEvents: 'auto',
-          }}>
-            <span style={{ color: 'var(--accent)', marginRight: 4 }}>✦</span> NGE
-          </span>
-          <div style={{ display: 'flex', gap: 4, pointerEvents: 'auto' }}>
-            <button style={iconBtn} onClick={handleShuffle} title="Shuffle">
-              <IconShuffle size={16} />
-            </button>
-            <button style={iconBtn} onClick={handleTogglePlay} title={isPlaying ? 'Pause' : 'Play'}>
-              {isPlaying ? <IconPause size={16} /> : <IconPlay size={16} />}
-            </button>
-          </div>
+          <span style={{ color: 'var(--accent)', marginRight: 4 }}>✦</span> NGE
+        </span>
+        <div style={{ display: 'flex', gap: 4, pointerEvents: 'auto' }}>
+          <button style={iconBtn} onClick={handleShuffle} title="Shuffle">
+            <IconShuffle size={16} />
+          </button>
+          <button style={iconBtn} onClick={handleTogglePlay} title={isPlaying ? 'Pause' : 'Play'}>
+            {isPlaying ? <IconPause size={16} /> : <IconPlay size={16} />}
+          </button>
         </div>
-
-        {/* Bottom-left presets toggle */}
-        <button onClick={() => setView(view === 'presets' ? 'controls' : 'presets')} style={{
-          position: 'absolute', bottom: 16, left: 16, zIndex: 10,
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 12px', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-md)', background: 'rgba(22,22,22,0.85)',
-          color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer',
-          fontFamily: 'inherit',
-        }}>
-          <IconLayout size={14} />
-          Presets
-        </button>
       </div>
 
-      {/* Right: Panel */}
+      {/* Bottom-left presets toggle — floats over canvas */}
+      <button onClick={() => setView(view === 'presets' ? 'controls' : 'presets')} style={{
+        position: 'absolute', bottom: 16, left: 16, zIndex: 15,
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 12px', border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--radius-md)', background: 'rgba(22,22,22,0.85)',
+        color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer',
+        fontFamily: 'inherit',
+      }}>
+        <IconLayout size={14} />
+        Presets
+      </button>
+
+      {/* Floating panel — overlaid on the right with 12px margin */}
       <aside style={{
-        width: 280, flexShrink: 0,
-        background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
+        position: 'absolute', top: 12, right: 12, bottom: 12,
+        width: 280,
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--radius-lg)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        zIndex: 10,
       }}>
         {view === 'controls' ? (
           <ControlPanel

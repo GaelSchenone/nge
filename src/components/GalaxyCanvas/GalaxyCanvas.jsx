@@ -521,7 +521,7 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     }
   }
 
-  return <div ref={containerRef} className={styles.wrapper} />
+  return <div ref={containerRef} className={styles.wrapper} style={{ position: 'absolute', inset: 0 }} />
 })
 
 export default GalaxyCanvas
