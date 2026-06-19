@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import GalaxyCanvas from './components/GalaxyCanvas/GalaxyCanvas'
 import ControlPanel from './components/ControlPanel/ControlPanel'
 import PresetsPanel from './components/PresetsPanel/PresetsPanel'
@@ -67,10 +67,15 @@ export default function App() {
     } catch { return DEFAULT_PARAMS }
   })
   const [isPlaying, setIsPlaying] = useState(true)
-  const [view, setView] = useState('controls') // 'controls' | 'presets'
+  const [view, setView] = useState('controls')
   const [exportOpen, setExportOpen] = useState(false)
   const [savedPresets, setSavedPresets] = useState(loadSavedPresets)
+  const [panelWidth, setPanelWidth] = useState(() => {
+    try { return Number(localStorage.getItem('nge-panel-width')) || 280 }
+    catch { return 280 }
+  })
   const canvasRef = useRef(null)
+  const dragRef = useRef(null)
 
   const handleTogglePlay = useCallback(() => setIsPlaying((p) => !p), [])
   const handleShuffle = useCallback(() => setParams(randomizeParams()), [])
@@ -92,10 +97,44 @@ export default function App() {
   }, [savedPresets, params])
 
   const handleSelectPreset = useCallback((preset) => {
-    if (preset.params) {
-      setParams(preset.params)
-    }
+    if (preset.params) setParams(preset.params)
     setView('controls')
+  }, [])
+
+  // Panel resize logic
+  const isDragging = useRef(false)
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging.current) return
+      const newWidth = window.innerWidth - e.clientX - 12
+      const clamped = Math.max(200, Math.min(600, newWidth))
+      setPanelWidth(clamped)
+    }
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
+  // Persist panel width
+  useEffect(() => {
+    localStorage.setItem('nge-panel-width', String(panelWidth))
+  }, [panelWidth])
+
+  const handleDragStart = useCallback(() => {
+    isDragging.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
   }, [])
 
   const iconBtn = {
@@ -107,12 +146,11 @@ export default function App() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
-      {/* Canvas fills the entire container */}
       <GalaxyCanvas ref={canvasRef} params={params} isPlaying={isPlaying} />
 
-      {/* Top toolbar — floats over canvas */}
+      {/* Top toolbar */}
       <div style={{
-        position: 'absolute', top: 12, left: 12, right: 12 + 280 + 12,
+        position: 'absolute', top: 12, left: 12, right: 12 + panelWidth + 12 + 8,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         pointerEvents: 'none', zIndex: 15,
       }}>
@@ -132,7 +170,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Bottom-left presets toggle — floats over canvas */}
+      {/* Bottom-left presets toggle */}
       <button onClick={() => setView(view === 'presets' ? 'controls' : 'presets')} style={{
         position: 'absolute', bottom: 16, left: 16, zIndex: 15,
         display: 'flex', alignItems: 'center', gap: 6,
@@ -145,16 +183,25 @@ export default function App() {
         Presets
       </button>
 
-      {/* Floating panel — overlaid on the right with 12px margin */}
+      {/* Draggable panel */}
       <aside style={{
         position: 'absolute', top: 12, right: 12, bottom: 12,
-        width: 280,
+        width: panelWidth,
         background: 'var(--bg-panel)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius-lg)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         zIndex: 10,
       }}>
+        {/* Drag handle — thin strip on the left edge */}
+        <div
+          ref={dragRef}
+          onMouseDown={handleDragStart}
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: 5,
+            cursor: 'col-resize', zIndex: 20,
+          }}
+        />
         {view === 'controls' ? (
           <ControlPanel
             params={params}
@@ -173,7 +220,6 @@ export default function App() {
         )}
       </aside>
 
-      {/* Export Modal */}
       <ExportModal
         open={exportOpen}
         onClose={() => setExportOpen(false)}

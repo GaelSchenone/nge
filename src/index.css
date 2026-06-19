@@ -1,6 +1,26 @@
 @import './styles/tokens.css';
 @import './styles/reset.css';
 
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-active);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-active) transparent;
+}
+
+/* ── Range sliders ── */
 input[type='range']::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
