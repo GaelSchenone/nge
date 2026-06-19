@@ -77,6 +77,13 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
   const apiRef = useRef({ canvas: null, resetCamera: () => {} })
   useImperativeHandle(ref, () => apiRef.current, [])
 
+  // Background color
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+    renderer.setClearColor(new THREE.Color(params.bgColor || '#0a0a0f'), 1)
+  }, [params.bgColor])
+
   // Setup
   useEffect(() => {
     const container = containerRef.current
@@ -92,7 +99,7 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(w, h)
-    renderer.setClearColor(0x0a0a0f, 1)
+    renderer.setClearColor(new THREE.Color('#0a0a0f'), 1)
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
 

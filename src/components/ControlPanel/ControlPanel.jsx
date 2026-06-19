@@ -83,6 +83,14 @@ export default function ControlPanel({ params, onChange, onReset, onResetCamera,
               <SliderControl label="Size" min={0.002} max={0.1} step={0.001} value={params.size} onChange={(v) => update('size', v)} formatValue={(v) => v.toFixed(3)} />
               <ColorControl label="Inner" color={params.innerColor} onChange={(v) => update('innerColor', v)} />
               <ColorControl label="Outer" color={params.outerColor} onChange={(v) => update('outerColor', v)} />
+              <div style={{ ...rowBase }}>
+                <span style={rowLabel}>Bg</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid var(--border-strong)', background: params.bgColor || '#0a0a0f', cursor: 'pointer', flexShrink: 0 }}
+                    onClick={() => { const i = document.createElement('input'); i.type = 'color'; i.value = params.bgColor || '#0a0a0f'; i.onchange = () => update('bgColor', i.value); i.click() }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{(params.bgColor || '#0a0a0f').toUpperCase()}</span>
+                </div>
+              </div>
             </ControlSection>
 
             <ControlSection title="NEBULA">

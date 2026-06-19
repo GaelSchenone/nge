@@ -8,6 +8,7 @@ export const DEFAULT_PARAMS = {
   size: 0.018,
   innerColor: '#FFFFFF',
   outerColor: '#A855F7',
+  bgColor: '#0a0a0f',
   nebula: {
     enabled: true,
     density: 0.7,
