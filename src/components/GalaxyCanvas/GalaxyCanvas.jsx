@@ -332,12 +332,27 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
       positions[i * 3 + 2] = r * Math.cos(phi)
     }
 
+    // Generate circular dot texture so starfield points aren't square
+    const dotCanvas = document.createElement('canvas')
+    dotCanvas.width = 32
+    dotCanvas.height = 32
+    const dctx = dotCanvas.getContext('2d')
+    const grad = dctx.createRadialGradient(16, 16, 0, 16, 16, 16)
+    grad.addColorStop(0, 'rgba(255,255,255,1)')
+    grad.addColorStop(0.3, 'rgba(255,255,255,0.8)')
+    grad.addColorStop(1, 'rgba(255,255,255,0)')
+    dctx.fillStyle = grad
+    dctx.fillRect(0, 0, 32, 32)
+    const dotTexture = new THREE.CanvasTexture(dotCanvas)
+    dotTexture.needsUpdate = true
+
     const color = new THREE.Color(params.starfield.color)
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     const mat = new THREE.PointsMaterial({
       color,
+      map: dotTexture,
       // PointsMaterial has no built-in distance-compensation factor (unlike the
       // galaxy's custom shader, which multiplies by 5000). Without a multiplier
       // the raw slider value (0.01) produces sub-pixel dots past ~50u.

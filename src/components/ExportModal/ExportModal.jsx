@@ -1,4 +1,4 @@
-import { useState, useCallback, createPortal } from 'react'
+import { useState, useCallback } from 'react'
 import ToggleGroup from './ToggleGroup'
 import { IconX, IconDownload, IconCheck } from '../icons/icons'
 
@@ -33,18 +33,23 @@ export default function ExportModal({ open, onClose, canvasRef }) {
     const c = canvasRef?.current
     const el = c?.canvas ?? c
     if (!el) return
-    const link = document.createElement('a')
-    link.download = `nge-galaxy.${format.toLowerCase()}`
-    link.href = el.toDataURL('image/png')
-    link.click()
+    el.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.download = `nge-galaxy.${format.toLowerCase()}`
+      link.href = url
+      link.click()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
   }, [canvasRef, format])
 
   if (!open) return null
 
-  return createPortal(
+  return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(0,0,0,0.3)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }} onClick={onClose}>
       <div style={{
@@ -159,7 +164,6 @@ export default function ExportModal({ open, onClose, canvasRef }) {
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   )
 }
