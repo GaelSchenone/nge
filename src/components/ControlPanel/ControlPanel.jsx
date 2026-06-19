@@ -43,28 +43,28 @@ export default function ControlPanel({ params, onChange, onReset, onResetCamera,
   }, [params])
 
   const handleExportComponent = useCallback(() => {
-    const workerCode = `
-self.onmessage=function({data}){
-  const{_target,stars,radius,arms,spin,scatter,density,size,innerColor,outerColor}=data
-  function hexToRgb(h){const v=parseInt(h.slice(1),16);return{r:((v>>16)&255)/255,g:((v>>8)&255)/255,b:(v&255)/255}}
-  const i=hexToRgb(innerColor),o=hexToRgb(outerColor)
+    const wkFn = (t) => `self.onmessage=function({data}){
+  const{stars,radius,arms,spin,scatter,density,size,innerColor,outerColor}=data
+  function h2r(h){const v=parseInt(h.slice(1),16);return{r:((v>>16)&255)/255,g:((v>>8)&255)/255,b:(v&255)/255}}
+  const i=h2r(innerColor),o=h2r(outerColor)
   const p=new Float32Array(stars*3),c=new Float32Array(stars*3),s=new Float32Array(stars)
   for(let n=0;n<stars;n++){
-    const a=n%arms,ai=a/arms*Math.PI*2,t=Math.pow(Math.random(),density),r=t*radius
+    const a=n%arms,ai=a/arms*Math.PI*2,td=Math.pow(Math.random(),density),r=td*radius
     const ang=ai+spin*r+(Math.random()-.5)*scatter*(1+r*.4),noi=scatter*r*.12,hf=.08+scatter*.18
     p[n*3]=Math.cos(ang)*r+(Math.random()-.5)*noi
     p[n*3+1]=(Math.random()-.5)*r*hf;p[n*3+2]=Math.sin(ang)*r+(Math.random()-.5)*noi
-    const mr=i.r+(o.r-i.r)*t,mg=i.g+(o.g-i.g)*t,mb=i.b+(o.b-i.b)*t
+    const mr=i.r+(o.r-i.r)*td,mg=i.g+(o.g-i.g)*td,mb=i.b+(o.b-i.b)*td
     c[n*3]=mr;c[n*3+1]=mg;c[n*3+2]=mb
-    s[n]=size*(.5+(1-t)*1.5)*(.8+Math.random()*.4)
+    s[n]=size*(.5+(1-td)*1.5)*(.8+Math.random()*.4)
   }
-  self.postMessage({_target,positions:p,colors:c,sizes:s},[p.buffer,c.buffer,s.buffer])
+  self.postMessage({_target:'${t}',positions:p,colors:c,sizes:s},[p.buffer,c.buffer,s.buffer])
 }`
-    const workerBlob = new Blob([workerCode], { type: 'application/javascript' })
-    const workerUrl = URL.createObjectURL(workerBlob)
+    const mWkUrl = URL.createObjectURL(new Blob([wkFn('main')], { type: 'application/javascript' }))
+    const dWkUrl = URL.createObjectURL(new Blob([wkFn('distant')], { type: 'application/javascript' }))
 
     const code = `import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 const VP=\`attribute float aSize;attribute vec3 aColor;varying vec3 vColor;
 void main(){vColor=aColor;vec4 mvPosition=modelViewMatrix*vec4(position,1.0);gl_PointSize=aSize*(5000.0/-mvPosition.z);gl_Position=projectionMatrix*mvPosition;}\`
@@ -76,14 +76,20 @@ export default function GalaxyBG({style,className}){
   useEffect(()=>{
     const el=ref.current;if(!el)return
     const w=el.clientWidth,h=el.clientHeight
-    const r=new THREE.WebGLRenderer({antialias:true})
-    r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(w,h);r.setClearColor(new THREE.Color(P.bgColor||'#0a0a0f'),1)
+    const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true})
+    r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(w,h)
+    r.setClearColor(new THREE.Color(P.bgColor||'#0a0a0f'),1)
     el.appendChild(r.domElement)
-    const s=new THREE.Scene(),c=new THREE.PerspectiveCamera(60,w/h,0.1,1e4)
-    c.position.set(0,6,14);c.lookAt(0,0,0)
+    const s=new THREE.Scene()
+    const cam=new THREE.PerspectiveCamera(60,w/h,0.1,1e4)
+    cam.position.set(0,6,14);cam.lookAt(0,0,0)
+    const ctrl=new OrbitControls(cam,r.domElement)
+    ctrl.enableDamping=true;ctrl.dampingFactor=.05;ctrl.minDistance=2;ctrl.maxDistance=80
     const gg=new THREE.Group();s.add(gg)
-    const wk=new Worker('${workerUrl}')
-    wk.onmessage=({data})=>{
+    const dg=new THREE.Group();dg.position.z=-200;dg.rotation.x=.4;s.add(dg)
+    // Main galaxy worker
+    const wkm=new Worker('${mWkUrl}')
+    wkm.onmessage=({data})=>{
       const{positions,colors,sizes}=data
       const g=new THREE.BufferGeometry()
       g.setAttribute('position',new THREE.BufferAttribute(positions,3))
@@ -92,13 +98,86 @@ export default function GalaxyBG({style,className}){
       const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:VP,fragmentShader:FP})
       gg.add(new THREE.Points(g,m))
     }
-    wk.postMessage({_target:'main',...P})
-    let lt=0
-    function anim(t){requestAnimationFrame(anim);lt||=t-16;const dt=Math.min(t-lt,50)/16;lt=t;gg.rotation.y+=.0002*dt;r.render(s,c)}
+    wkm.postMessage({stars:P.stars,radius:P.radius,arms:P.arms,spin:P.spin,scatter:P.scatter,density:P.density,size:P.size,innerColor:P.innerColor,outerColor:P.outerColor})
+    // Distant galaxy worker
+    if(P.distant?.enabled){
+      const wkd=new Worker('${dWkUrl}')
+      wkd.onmessage=({data})=>{
+        const{positions,colors,sizes}=data
+        const g=new THREE.BufferGeometry()
+        g.setAttribute('position',new THREE.BufferAttribute(positions,3))
+        g.setAttribute('aColor',new THREE.BufferAttribute(colors,3))
+        g.setAttribute('aSize',new THREE.BufferAttribute(sizes,1))
+        const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:VP,fragmentShader:FP})
+        dg.add(new THREE.Points(g,m))
+      }
+      wkd.postMessage({stars:P.distant.stars,radius:P.distant.radius,arms:P.distant.arms,spin:P.distant.spin,scatter:P.distant.scatter,density:2.8,size:P.distant.size,innerColor:P.distant.innerColor,outerColor:P.distant.outerColor})
+    }
+    // Starfield (circular dots)
+    if(P.starfield?.enabled){
+      const dc=document.createElement('canvas');dc.width=32;dc.height=32
+      const dctx=dc.getContext('2d')
+      const dgrd=dctx.createRadialGradient(16,16,0,16,16,16)
+      dgrd.addColorStop(0,'rgba(255,255,255,1)');dgrd.addColorStop(.3,'rgba(255,255,255,.8)');dgrd.addColorStop(1,'rgba(255,255,255,0)')
+      dctx.fillStyle=dgrd;dctx.fillRect(0,0,32,32)
+      const dt=new THREE.CanvasTexture(dc);dt.needsUpdate=true
+      const cnt=P.starfield.count||5000
+      const pos=new Float32Array(cnt*3)
+      for(let i=0;i<cnt;i++){const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),rad=60+Math.cbrt(Math.random())*440;pos[i*3]=rad*Math.sin(ph)*Math.cos(th);pos[i*3+1]=rad*Math.sin(ph)*Math.sin(th);pos[i*3+2]=rad*Math.cos(ph)}
+      const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.BufferAttribute(pos,3))
+      const sm=new THREE.PointsMaterial({color:P.starfield.color||'#fff',map:dt,size:(P.starfield.size||.015)*150,transparent:true,opacity:.9,depthWrite:false,sizeAttenuation:true})
+      const sf=new THREE.Points(sg,sm);sf.frustumCulled=false;s.add(sf)
+    }
+    // Nebula
+    if(P.nebula?.enabled){
+      const nc=document.createElement('canvas');nc.width=512;nc.height=512
+      const nctx=nc.getContext('2d')
+      const ng=nctx.createRadialGradient(256,256,0,256,256,256)
+      ng.addColorStop(0,'rgba(255,255,255,1)');ng.addColorStop(.15,'rgba(255,255,255,.7)');ng.addColorStop(1,'rgba(255,255,255,0)')
+      nctx.fillStyle=ng;nctx.fillRect(0,0,512,512)
+      const nt=new THREE.CanvasTexture(nc);nt.needsUpdate=true
+      for(let i=0;i<8;i++){
+        const ai=Math.floor(Math.random()*P.arms),ao=ai/P.arms*Math.PI*2,td=.3+Math.random()*.6,rr=td*P.radius
+        const ang=ao+P.spin*rr+(Math.random()-.5)*P.scatter,noi=P.scatter*rr*.12
+        const x=Math.cos(ang)*rr+(Math.random()-.5)*noi,z=Math.sin(ang)*rr+(Math.random()-.5)*noi,y=(Math.random()-.5)*rr*.06
+        const col=Math.random()>.5?P.nebula.color1:P.nebula.color2
+        const nmat=new THREE.SpriteMaterial({map:nt,color:col,transparent:true,opacity:P.nebula.opacity||.4,blending:THREE.AdditiveBlending,depthWrite:false})
+        const sp=new THREE.Sprite(nmat);sp.position.set(x,y,z);const sc=(P.nebula.density||.7)*P.radius*.8;sp.scale.set(sc,sc,1);gg.add(sp)
+      }
+    }
+    // Animation loop
+    let lt=0;let lastSpawn=0;const falls=[]
+    function anim(t){
+      requestAnimationFrame(anim)
+      const dt=lt?Math.min(t-lt,50)/16:1;lt=t
+      ctrl.update()
+      if(P.distant?.enabled) dg.rotation.y+=P.distant.speed*.0001*dt
+      if(P.animation?.mode==='Spin') gg.rotation.y+=.0002*(P.animation.speed||1)*dt
+      else if(P.animation?.mode==='Orbit'){ctrl.autoRotate=true;ctrl.autoRotateSpeed=P.animation.speed||1}
+      else ctrl.autoRotate=false
+      // Starfalls
+      if(P.starfalls?.enabled&&Date.now()-lastSpawn>800&&falls.length<12){
+        lastSpawn=Date.now()
+        const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),rad=10+Math.random()*4
+        const sx=rad*Math.sin(ph)*Math.cos(th),sy=rad*Math.sin(ph)*Math.sin(th),sz=rad*Math.cos(ph)
+        const seg=30;const sp2=new Float32Array(seg*3)
+        const sg2=new THREE.BufferGeometry();sg2.setAttribute('position',new THREE.BufferAttribute(sp2,3))
+        const lm=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:1,blending:THREE.AdditiveBlending})
+        const ln=new THREE.Line(sg2,lm);s.add(ln)
+        const startP=new THREE.Vector3(sx,sy,sz)
+        falls.push({line:ln,start:Date.now(),dur:1200})
+      }
+      for(let si=falls.length-1;si>=0;si--){
+        const f=falls[si],prog=Math.min((Date.now()-f.start)/f.dur,1)
+        f.line.material.opacity=Math.max(0,1-prog*1.2)
+        if(prog>=1){s.remove(f.line);f.line.geometry.dispose();f.line.material.dispose();falls.splice(si,1)}
+      }
+      r.render(s,cam)
+    }
     requestAnimationFrame(anim)
-    return()=>{r.dispose();wk.terminate();r.domElement.remove()}
+    return()=>{r.dispose();wkm.terminate();r.domElement.remove()}
   },[])
-  return<dib ref={ref} style={{position:'fixed',inset:0,overflow:'hidden',...style}} className={className}/>
+  return<div ref={ref} style={{position:'fixed',inset:0,overflow:'hidden',...style}} className={className}/>
 }`
     const blob = new Blob([code], { type: 'text/jsx' })
     const url = URL.createObjectURL(blob)
@@ -106,7 +185,8 @@ export default function GalaxyBG({style,className}){
     link.download = 'GalaxyBackground.jsx'
     link.href = url; link.click()
     URL.revokeObjectURL(url)
-    setTimeout(() => URL.revokeObjectURL(workerUrl), 60000)
+    setTimeout(() => URL.revokeObjectURL(mWkUrl), 60000)
+    setTimeout(() => URL.revokeObjectURL(dWkUrl), 60000)
   }, [params])
 
   const handleResetCamera = useCallback(() => onResetCamera?.(), [onResetCamera])
