@@ -16,6 +16,7 @@ export default [
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z]' }],
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
     languageOptions: {
       globals: globals.browser,
