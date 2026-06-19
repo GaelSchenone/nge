@@ -1,0 +1,43 @@
+export const DEFAULT_PARAMS = {
+  stars: 90000,
+  radius: 8,
+  arms: 5,
+  spin: 1.8,
+  scatter: 0.35,
+  density: 2.8,
+  size: 0.018,
+  innerColor: '#FFFFFF',
+  outerColor: '#A855F7',
+  nebula: {
+    enabled: true,
+    density: 0.7,
+    opacity: 0.4,
+    color1: '#C084FC',
+    color2: '#6366F1',
+  },
+  starfield: {
+    enabled: true,
+    count: 8000,
+    size: 0.015,
+    color: '#FFFFFF',
+  },
+  starfalls: {
+    enabled: false,
+  },
+  animation: {
+    mode: 'Orbit',
+    speed: 2.5,
+  },
+  distant: {
+    enabled: true,
+    stars: 100000,
+    radius: 80,
+    arms: 5,
+    spin: 2,
+    scatter: 0.4,
+    speed: 1,
+    size: 0.2,
+    innerColor: '#A855F7',
+    outerColor: '#06B6D4',
+  },
+}

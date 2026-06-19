@@ -1,0 +1,57 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  background: #0a0a0f;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  color: #e8e8f0;
+  text-transform: uppercase;
+}
+
+.star {
+  color: #f5a623;
+  margin-right: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b6b80;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  background: #1a1a24;
+  color: #e8e8f0;
+}
+
+.btn:active {
+  background: #22222e;
+}
+
+.active {
+  color: #e8e8f0;
+}
