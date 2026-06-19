@@ -5,7 +5,7 @@ export default function Header({ isPlaying, isPanelOpen, onTogglePlay, onToggleP
   return (
     <header className={styles.header}>
       <div className={styles.logo}>
-        <span className={styles.star}>★</span> S T A R D U S T
+        <span className={styles.star}>✦</span> N G E
       </div>
       <div className={styles.actions}>
         <button className={styles.btn} onClick={onShuffle} title="Shuffle">
