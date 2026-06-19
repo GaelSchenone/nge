@@ -27,7 +27,7 @@ function randFloat(min, max) {
 }
 
 function randomizeParams() {
-  const modes = ['Static', 'Orbit', 'Spin']
+  const modes = ['Static', 'Parallax', 'Spin']
   return {
     ...DEFAULT_PARAMS,
     stars: randInt(10000, 120000),

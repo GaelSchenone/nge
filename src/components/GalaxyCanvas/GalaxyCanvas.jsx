@@ -1,6 +1,6 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+// (OrbitControls removed — this is a background, not an interactive viewer)
 import styles from './GalaxyCanvas.module.css'
 
 const vertexShader = `
@@ -56,7 +56,7 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
   const rendererRef = useRef(null)
   const sceneRef = useRef(null)
   const cameraRef = useRef(null)
-  const controlsRef = useRef(null)
+  const mouseRef = useRef({ x: 0, y: 0 })
   const galaxyGroupRef = useRef(null)
   const distantGroupRef = useRef(null)
   const galaxyMeshRef = useRef(null)
@@ -111,12 +111,11 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     camera.lookAt(0, 0, 0)
     cameraRef.current = camera
 
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.dampingFactor = 0.05
-    controls.minDistance = 2
-    controls.maxDistance = 80
-    controlsRef.current = controls
+    // Mouse tracking for Parallax mode
+    const handleMouse = (e) => {
+      mouseRef.current = { x: (e.clientX / w - 0.5) * 2, y: (e.clientY / h - 0.5) * 2 }
+    }
+    window.addEventListener('mousemove', handleMouse)
 
     const galaxyGroup = new THREE.Group()
     scene.add(galaxyGroup)
@@ -182,6 +181,7 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
       worker.terminate()
       renderer.dispose()
       renderer.domElement.remove()
+      window.removeEventListener('mousemove', handleMouse)
     }
   }, [])
 
@@ -391,23 +391,23 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     const renderer = rendererRef.current
     const scene = sceneRef.current
     const camera = cameraRef.current
-    const controls = controlsRef.current
     const galaxyGroup = galaxyGroupRef.current
     const distantGroup = distantGroupRef.current
-    if (!renderer || !scene || !camera || !controls || !galaxyGroup || !distantGroup) return
+    if (!renderer || !scene || !camera || !galaxyGroup || !distantGroup) return
 
     let lastTime = 0
+    let targetRotationX = 0
+    let targetRotationY = 0
+    let currentRotationX = 0
+    let currentRotationY = 0
+    const maxParallax = 0.04
 
     function animate(time) {
       frameRef.current = requestAnimationFrame(animate)
 
       const dt = lastTime === 0 ? 16 : time - lastTime
       lastTime = time
-
-      // Normalize all movement to 60fps baseline for frame-rate independence
       const speedFactor = Math.min(dt, 50) / 16
-
-      controls.update()
 
       if (isPlaying) {
         // Distant galaxy always spins
@@ -416,14 +416,22 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
         // Main galaxy animation mode
         if (params.animation.mode === 'Spin') {
           galaxyGroup.rotation.y += 0.0002 * params.animation.speed * speedFactor
-        } else if (params.animation.mode === 'Orbit') {
-          controls.autoRotate = true
-          controls.autoRotateSpeed = params.animation.speed
+          galaxyGroup.rotation.x = 0 // reset parallax
+        } else if (params.animation.mode === 'Parallax') {
+          // Follow mouse with smooth lerp
+          const mx = mouseRef.current.x
+          const my = mouseRef.current.y
+          targetRotationY = mx * maxParallax
+          targetRotationX = my * maxParallax
+          currentRotationY += (targetRotationY - currentRotationY) * 0.03 * speedFactor
+          currentRotationX += (targetRotationX - currentRotationX) * 0.03 * speedFactor
+          galaxyGroup.rotation.y = currentRotationY
+          galaxyGroup.rotation.x = currentRotationX
         } else {
-          controls.autoRotate = false
+          // Static — reset any rotation
+          galaxyGroup.rotation.x *= 0.95
+          galaxyGroup.rotation.y *= 0.95
         }
-      } else {
-        controls.autoRotate = false
       }
 
       // Starfalls
@@ -445,7 +453,6 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
           camera.lookAt(0, 0, 0)
           cameraLerpRef.current = false
         }
-        controls.target.set(0, 0, 0)
       }
 
       renderer.render(scene, camera)

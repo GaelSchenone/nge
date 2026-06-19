@@ -13,7 +13,7 @@ function mkPreset(id, name, inner, outer, bg, overrides = {}) {
       nebula: { enabled: true, density: 0.7, opacity: 0.4, color1: inner, color2: outer },
       starfield: { enabled: true, count: 8000, size: 0.015, color: '#FFFFFF' },
       starfalls: { enabled: false },
-      animation: { mode: 'Orbit', speed: 2.5 },
+      animation: { mode: "Parallax", speed: 2.5 },
       distant: {
         enabled: true, stars: 100000, radius: 80, arms: 5, spin: 2, scatter: 0.4, speed: 1,
         size: 0.2, innerColor: inner, outerColor: outer,

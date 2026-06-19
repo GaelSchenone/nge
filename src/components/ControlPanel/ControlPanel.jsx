@@ -62,7 +62,7 @@ self.postMessage({_target:'main',positions:p,colors:c,sizes:s},[p.buffer,c.buffe
 
     const code = `import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+// Background component — no OrbitControls needed
 
 const VP=\`attribute float aSize;attribute vec3 aColor;varying vec3 vColor;
 void main(){vColor=aColor;vec4 mvPosition=modelViewMatrix*vec4(position,1.0);gl_PointSize=aSize*(5000.0/-mvPosition.z);gl_Position=projectionMatrix*mvPosition;}\`
@@ -91,8 +91,9 @@ export default function GalaxyBG({style,className}){
     const s=new THREE.Scene()
     const cam=new THREE.PerspectiveCamera(60,w/h,0.1,1e4)
     cam.position.set(0,6,14);cam.lookAt(0,0,0)
-    const ctrl=new OrbitControls(cam,r.domElement)
-    ctrl.enableDamping=true;ctrl.dampingFactor=.05;ctrl.minDistance=2;ctrl.maxDistance=80
+    const mouse={x:0,y:0}
+    const onMouse=(e)=>{const ww=window.innerWidth,wh=window.innerHeight;mouse.x=(e.clientX/ww-.5)*2;mouse.y=(e.clientY/wh-.5)*2}
+    window.addEventListener('mousemove',onMouse)
     const gg=new THREE.Group();s.add(gg)
     const dg=new THREE.Group();dg.position.z=-200;dg.rotation.x=.4;s.add(dg)
     // Main galaxy worker (inline, no origin-locked blob)
@@ -158,11 +159,11 @@ export default function GalaxyBG({style,className}){
     function anim(t){
       requestAnimationFrame(anim)
       const dt=lt?Math.min(t-lt,50)/16:1;lt=t
-      ctrl.update()
+      // no controls
       if(P.distant?.enabled) dg.rotation.y+=P.distant.speed*.0001*dt
       if(P.animation?.mode==='Spin') gg.rotation.y+=.0002*(P.animation.speed||1)*dt
-      else if(P.animation?.mode==='Orbit'){ctrl.autoRotate=true;ctrl.autoRotateSpeed=P.animation.speed||1}
-      else ctrl.autoRotate=false
+      else if(P.animation?.mode==='Parallax'){const maxP=.04;const tx=mouse.x*maxP,ty=mouse.y*maxP;gg.rotation.y+=(tx-gg.rotation.y)*.03;gg.rotation.x+=(ty-gg.rotation.x)*.03}
+      else{gg.rotation.x*=.95;gg.rotation.y*=.95}
       if(P.starfalls?.enabled&&Date.now()-lastSpawn>800&&falls.length<12){
         lastSpawn=Date.now()
         const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),rad=10+Math.random()*4
@@ -181,7 +182,7 @@ export default function GalaxyBG({style,className}){
       r.render(s,cam)
     }
     requestAnimationFrame(anim)
-    return()=>{r.dispose();wkm.terminate();r.domElement.remove()}
+    return()=>{r.dispose();wkm.terminate();r.domElement.remove();window.removeEventListener('mousemove',onMouse)}
   },[])
   return<div ref={ref} style={{position:'fixed',inset:0,overflow:'hidden',...style}} className={className}/>
 }`
@@ -302,7 +303,7 @@ export default function GalaxyBG({style,className}){
 
             <ControlSection title="ANIMATION">
               <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-strong)', margin: '6px 16px' }}>
-                {['Static', 'Orbit', 'Spin'].map((m) => (
+                {['Static', 'Parallax', 'Spin'].map((m) => (
                   <button key={m} onClick={() => updateSection('animation', 'mode', m)} style={{
                     flex: 1, padding: '5px 8px', border: 'none', fontSize: 11, cursor: 'pointer',
                     fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s',
