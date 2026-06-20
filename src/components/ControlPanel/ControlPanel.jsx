@@ -88,6 +88,11 @@ export default function GalaxyBG({style,className}){
     r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(w,h)
     r.setClearColor(new THREE.Color(P.bgColor||'#0a0a0f'),1)
     el.appendChild(r.domElement)
+    const ro=new ResizeObserver(([e])=>{
+      const w2=e.contentRect.width,h2=e.contentRect.height
+      if(w2&&h2){r.setSize(w2,h2);cam.aspect=w2/h2;cam.updateProjectionMatrix()}
+    })
+    ro.observe(el)
     const s=new THREE.Scene()
     const cam=new THREE.PerspectiveCamera(60,w/h,0.1,1e4)
     cam.position.set(0,6,14);cam.lookAt(0,0,0)
@@ -190,7 +195,7 @@ export default function GalaxyBG({style,className}){
       r.render(s,cam)
     }
     requestAnimationFrame(anim)
-    return()=>{r.dispose();wkm.terminate();r.domElement.remove();window.removeEventListener('mousemove',onMouse)}
+    return()=>{ro.disconnect();r.dispose();wkm.terminate();r.domElement.remove();window.removeEventListener('mousemove',onMouse)}
   },[])
   return<div ref={ref} style={{position:'fixed',inset:0,overflow:'hidden',...style}} className={className}/>
 }`
