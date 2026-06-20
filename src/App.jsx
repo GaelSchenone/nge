@@ -27,7 +27,6 @@ function randFloat(min, max) {
 }
 
 function randomizeParams() {
-  const modes = ['Static', 'Parallax', 'Spin']
   return {
     ...DEFAULT_PARAMS,
     stars: randInt(10000, 120000),
@@ -48,7 +47,7 @@ function randomizeParams() {
     },
     starfield: { enabled: true, count: randInt(1000, 8000), size: randFloat(0.003, 0.03), color: '#FFFFFF' },
     starfalls: { enabled: Math.random() > 0.6 },
-    animation: { mode: modes[randInt(0, 2)], speed: randFloat(0.5, 5) },
+    animation: { parallax: true, spin: true, scroll: false, speed: randFloat(0.5, 5) },
     distant: {
       ...DEFAULT_PARAMS.distant,
       stars: randInt(10000, 150000), radius: randFloat(10, 100),

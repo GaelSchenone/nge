@@ -396,11 +396,15 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     if (!renderer || !scene || !camera || !galaxyGroup || !distantGroup) return
 
     let lastTime = 0
-    let targetRotationX = 0
-    let targetRotationY = 0
-    let currentRotationX = 0
-    let currentRotationY = 0
+    let currentParallaxX = 0
+    let currentParallaxY = 0
+    let scrollY = 0
     const maxParallax = 0.04
+
+    function handleScroll() {
+      scrollY = window.scrollY || document.documentElement.scrollTop || 0
+    }
+    window.addEventListener('scroll', handleScroll)
 
     function animate(time) {
       frameRef.current = requestAnimationFrame(animate)
@@ -413,24 +417,32 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
         // Distant galaxy always spins
         distantGroup.rotation.y += params.distant.speed * 0.0001 * speedFactor
 
-        // Main galaxy animation mode
-        if (params.animation.mode === 'Spin') {
-          galaxyGroup.rotation.y += 0.0002 * params.animation.speed * speedFactor
-          galaxyGroup.rotation.x = 0 // reset parallax
-        } else if (params.animation.mode === 'Parallax') {
-          // Follow mouse with smooth lerp
+        // Spin
+        if (params.animation.spin) {
+          galaxyGroup.rotation.y += 0.0002 * (params.animation.speed || 1) * speedFactor
+        }
+
+        // Parallax (mouse tracking)
+        if (params.animation.parallax) {
           const mx = mouseRef.current.x
           const my = mouseRef.current.y
-          targetRotationY = mx * maxParallax
-          targetRotationX = my * maxParallax
-          currentRotationY += (targetRotationY - currentRotationY) * 0.03 * speedFactor
-          currentRotationX += (targetRotationX - currentRotationX) * 0.03 * speedFactor
-          galaxyGroup.rotation.y = currentRotationY
-          galaxyGroup.rotation.x = currentRotationX
+          const targetX = my * maxParallax
+          const targetY = mx * maxParallax
+          currentParallaxX += (targetX - currentParallaxX) * 0.03 * speedFactor
+          currentParallaxY += (targetY - currentParallaxY) * 0.03 * speedFactor
         } else {
-          // Static — reset any rotation
-          galaxyGroup.rotation.x *= 0.95
-          galaxyGroup.rotation.y *= 0.95
+          currentParallaxX *= 0.95
+          currentParallaxY *= 0.95
+        }
+
+        // Scroll
+        if (params.animation.scroll && typeof window !== 'undefined') {
+          const docEl = document.documentElement
+          const scrollMax = Math.max(1, (docEl.scrollHeight || 1) - window.innerHeight)
+          const progress = scrollY / scrollMax
+          galaxyGroup.rotation.x = -progress * 0.15 + currentParallaxX
+        } else if (!params.animation.scroll) {
+          galaxyGroup.rotation.x = currentParallaxX
         }
       }
 
@@ -459,8 +471,11 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
     }
 
     frameRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(frameRef.current)
-  }, [isPlaying, params.animation.mode, params.animation.speed, params.distant.speed, params.starfalls.enabled])
+    return () => {
+      cancelAnimationFrame(frameRef.current)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [isPlaying, params.animation.spin, params.animation.parallax, params.animation.scroll, params.animation.speed, params.distant.speed, params.starfalls.enabled])
 
   function spawnStarfall(scene) {
     const theta = Math.random() * Math.PI * 2

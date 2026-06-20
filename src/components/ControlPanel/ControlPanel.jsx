@@ -155,15 +155,23 @@ export default function GalaxyBG({style,className}){
       }
     }
     // Animation
-    let lt=0;let lastSpawn=0;const falls=[]
+    let lt=0;let lastSpawn=0;let px=0;let py=0;const falls=[]
     function anim(t){
       requestAnimationFrame(anim)
       const dt=lt?Math.min(t-lt,50)/16:1;lt=t
       // no controls
       if(P.distant?.enabled) dg.rotation.y+=P.distant.speed*.0001*dt
-      if(P.animation?.mode==='Spin') gg.rotation.y+=.0002*(P.animation.speed||1)*dt
-      else if(P.animation?.mode==='Parallax'){const maxP=.04;const tx=mouse.x*maxP,ty=mouse.y*maxP;gg.rotation.y+=(tx-gg.rotation.y)*.03;gg.rotation.x+=(ty-gg.rotation.x)*.03}
-      else{gg.rotation.x*=.95;gg.rotation.y*=.95}
+      if(P.animation?.spin) gg.rotation.y+=.0002*(P.animation.speed||1)*dt
+      const maxP=.04;const pp=.03
+      if(P.animation?.parallax){
+        const tx=mouse.x*maxP,ty=mouse.y*maxP
+        px+=(ty-px)*pp;py+=(tx-py)*pp
+      }else{px*=.95;py*=.95}
+      if(P.animation?.scroll&&typeof window!=='undefined'){
+        const sm=Math.max(1,(document.documentElement.scrollHeight||1)-window.innerHeight)
+        const pr=(window.scrollY||document.documentElement.scrollTop||0)/sm
+        gg.rotation.x=-pr*.15+px
+      }else{gg.rotation.x=px}
       if(P.starfalls?.enabled&&Date.now()-lastSpawn>800&&falls.length<12){
         lastSpawn=Date.now()
         const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),rad=10+Math.random()*4
@@ -302,16 +310,10 @@ export default function GalaxyBG({style,className}){
             </div>
 
             <ControlSection title="ANIMATION">
-              <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-strong)', margin: '6px 16px' }}>
-                {['Static', 'Parallax', 'Spin'].map((m) => (
-                  <button key={m} onClick={() => updateSection('animation', 'mode', m)} style={{
-                    flex: 1, padding: '5px 8px', border: 'none', fontSize: 11, cursor: 'pointer',
-                    fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s',
-                    background: params.animation.mode === m ? '#ffffff' : 'transparent',
-                    color: params.animation.mode === m ? '#0e0e0e' : 'var(--text-muted)',
-                    fontWeight: params.animation.mode === m ? 500 : 400,
-                  }}>{m}</button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 16px' }}>
+                <CheckRow label="Parallax" checked={params.animation.parallax} onChange={(v) => updateSection('animation', 'parallax', v)} />
+                <CheckRow label="Spin" checked={params.animation.spin} onChange={(v) => updateSection('animation', 'spin', v)} />
+                <CheckRow label="Scroll" checked={params.animation.scroll} onChange={(v) => updateSection('animation', 'scroll', v)} />
               </div>
               <SliderControl label="Speed" min={0} max={10} step={0.1} value={params.animation.speed} onChange={(v) => updateSection('animation', 'speed', v)} />
             </ControlSection>
@@ -403,6 +405,28 @@ function ToggleSwitch({ checked, onChange }) {
           top: 3, left: checked ? 17 : 3, transition: 'transform 0.15s',
         }} />
       </span>
+    </label>
+  )
+}
+
+function CheckRow({ label, checked, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '2px 0' }}>
+      <span style={{
+        position: 'relative', width: 14, height: 14, flexShrink: 0,
+        background: checked ? 'var(--accent)' : 'var(--bg-active)',
+        borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 0.15s',
+      }}>
+        {checked && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </span>
+      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
+        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }} />
     </label>
   )
 }

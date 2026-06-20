@@ -26,7 +26,9 @@ export const DEFAULT_PARAMS = {
     enabled: false,
   },
   animation: {
-    mode: 'Parallax',
+    parallax: true,
+    spin: true,
+    scroll: false,
     speed: 2.5,
   },
   distant: {
