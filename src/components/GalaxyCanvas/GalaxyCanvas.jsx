@@ -440,7 +440,7 @@ const GalaxyCanvas = forwardRef(function GalaxyCanvas({ params, isPlaying }, ref
           const docEl = document.documentElement
           const scrollMax = Math.max(1, (docEl.scrollHeight || 1) - window.innerHeight)
           const progress = scrollY / scrollMax
-          galaxyGroup.rotation.x = -progress * 0.15 + currentParallaxX
+          galaxyGroup.rotation.x = -progress * 0.06 + currentParallaxX
         } else if (!params.animation.scroll) {
           galaxyGroup.rotation.x = currentParallaxX
         }

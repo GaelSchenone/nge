@@ -175,7 +175,7 @@ export default function GalaxyBG({style,className}){
       if(P.animation?.scroll&&typeof window!=='undefined'){
         const sm=Math.max(1,(document.documentElement.scrollHeight||1)-window.innerHeight)
         const pr=(window.scrollY||document.documentElement.scrollTop||0)/sm
-        gg.rotation.x=-pr*.15+px
+        gg.rotation.x=-pr*.06+px
       }else{gg.rotation.x=px}
       if(P.starfalls?.enabled&&Date.now()-lastSpawn>800&&falls.length<12){
         lastSpawn=Date.now()
